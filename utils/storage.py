@@ -31,3 +31,5 @@ def reset_history():
     """Efface uniquement les expériences, dans une transaction SQLite."""
     with connect() as db:
         db.execute("DELETE FROM runs")
+        if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='experiments'").fetchone():
+            db.execute("DELETE FROM experiments")

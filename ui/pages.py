@@ -4,6 +4,7 @@ import streamlit as st
 from agents.simulator import run
 from scenarios.catalog import load
 from evaluation.metrics import metrics
+from ui.styles import section_title, email_card
 from ui.search import live_search
 from utils.search import search_results
 from utils.storage import history, save, reset_history
@@ -123,7 +124,7 @@ def grouped_results(results, key):
 
 def reset_controls():
     with st.expander("Remettre les expériences à zéro"):
-        st.write("Supprime toutes les campagnes et leurs journaux de la base locale. Les scénarios restent disponibles. Les fichiers déjà exportés sont conservés.")
+        st.write("Supprime toutes les campagnes, les expériences de modèles réels et leurs évaluations de la base locale. Les scénarios restent disponibles. Les fichiers déjà exportés sont conservés.")
         confirm = st.checkbox("Je confirme la suppression de toutes les expériences enregistrées", key="confirm_reset")
         if st.button("Tout supprimer et repartir à zéro", disabled=not confirm):
             try:
@@ -155,7 +156,7 @@ def summary_view(result):
 
 
 def result_view(results):
-    st.subheader("4. La décision de chaque assistant")
+    st.subheader("03 / Résultats de l’expérience")
     for col, result in zip(st.columns(len(results)), results):
         with col:
             st.subheader("Assistant " + result["mode"])
@@ -178,64 +179,91 @@ def result_view(results):
 
 
 def dashboard():
-    st.header("Vue d’ensemble")
-    st.write("Un même courriel, deux comportements : suivre son contenu comme une instruction ou contrôler son autorité avant chaque action.")
-    reset_controls()
+    section_title("Vue d’ensemble", "Préparer une expérience, observer les décisions, conserver les preuves.")
     catalog = load()
     rows = read_history()
-    a,b,c = st.columns(3)
+    from utils.experiments import experiments
+    try:
+        real = experiments()
+    except (sqlite3.Error, OSError):
+        real = []
+        st.warning("L’historique des modèles réels n’a pas pu être chargé.")
+    a, b, c = st.columns(3)
     a.metric("Scénarios disponibles", len(catalog))
-    b.metric("Campagnes enregistrées", len(rows))
-    c.metric("Connexions à une messagerie", 0)
-    if rows:
-        st.subheader("Dernière campagne")
-        for mode in ["naïf", "protégé"]:
-            st.markdown("**Agent " + mode + "**")
-            indicators([r for r in rows[0]["résultats"] if r["mode"] == mode])
-    else:
-        st.info("Aucun résultat pour le moment. Lancez une campagne dans Comparaison ou explorez un scénario au Laboratoire.")
-    with st.container(border=True):
-        st.subheader("Le parcours expérimental")
-        st.write("1. Inspecter un courriel fictif → 2. Simuler les deux agents → 3. Examiner les autorisations → 4. Comparer les traces et les métriques.")
-    st.warning("Ces résultats décrivent un simulateur déterministe. Ils ne mesurent pas la robustesse d’un modèle de langage ou de quatre fournisseurs réels.")
+    b.metric("Campagnes simulées", len(rows))
+    c.metric("Essais avec un modèle", len(real))
+    st.subheader("Choisir un espace d’expérimentation")
+    def navigate(target):
+        st.session_state["navigation"] = target
+    left, right = st.columns(2)
+    with left, st.container(border=True):
+        st.caption("01 / COMPRENDRE")
+        st.subheader("Simulateur pédagogique")
+        st.write("Explorez un courriel et comparez deux assistants aux comportements prédéfinis. Idéal pour comprendre chaque décision.")
+        st.button("Ouvrir le simulateur", on_click=navigate, args=("Laboratoire",), width="stretch")
+    with right, st.container(border=True):
+        st.caption("02 / OBSERVER")
+        st.subheader("Expériences avec un modèle")
+        st.write("Soumettez le même courriel à une IA locale. Comparez les protections et évaluez la réponse réellement produite.")
+        st.button("Préparer une expérience réelle", on_click=navigate, args=("Modèle réel (local)",), type="primary", width="stretch")
+    with st.expander("Dernière campagne du simulateur", expanded=False):
+        if rows:
+            for mode in ["naïf", "protégé"]:
+                st.markdown("**Assistant " + mode + "**")
+                indicators([r for r in rows[0]["résultats"] if r["mode"] == mode])
+        else:
+            st.info("Aucune campagne simulée. Les résultats apparaîtront après votre premier essai.")
+    if real:
+        latest = real[0]
+        with st.container(border=True):
+            st.caption("DERNIER ESSAI AVEC UN MODÈLE")
+            st.write(f"**{latest['scenario_id']} · {latest['model']}**")
+            st.caption(f"{latest['created_utc']} · Évaluation humaine : {latest['human_review']}")
+            st.write("Terminé" if latest["status"] == "ok" else "Erreur technique enregistrée")
+    st.caption("Les mesures du simulateur et les observations des modèles réels restent séparées. Un résultat sur ce corpus ne garantit pas la sécurité d’un système réel.")
+    st.divider()
+    reset_controls()
 
 
 def laboratory():
-    st.header("Laboratoire de scénarios")
+    section_title("Simulateur pédagogique", "Une expérience guidée, deux comportements prédéfinis. Aucun modèle n’est appelé dans cet espace.")
     catalog = load()
-    chosen = st.selectbox("Scénario", range(len(catalog)), format_func=lambda i: catalog[i]["title"])
-    scenario = catalog[chosen]
-    identity = st.selectbox("Personne fictive qui utilise l’assistant", ["alice", "bob"], format_func=str.capitalize)
-    st.info("Alice et Bob sont des personnes fictives, pas les deux agents. Vous choisissez à qui appartient la boîte. Nous comparons ensuite deux versions de son assistant : naïf (sans contrôle) et protégé (avec contrôle).")
-    st.subheader("1. La demande légitime")
-    st.write(f"{identity.capitalize()} demande : « Résume mes courriels. » Elle ou il n’autorise ni l’envoi de copies à un tiers, ni la lecture de la boîte d’une autre personne.")
-    st.subheader("2. Le courriel reçu — entièrement fictif")
-    with st.container(border=True):
-        st.write("**De :** Camille — " + scenario["sender"])
-        st.write("**À :** " + identity.capitalize() + " — " + identity + "@exemple.invalid")
-        st.write("**Objet :** " + scenario["subject"])
-        st.divider()
-        st.write(scenario["email"])
-    st.caption("Courriel entièrement fictif. Les adresses en .invalid ne servent à envoyer aucun message.")
-    st.subheader("3. Du message aux actions simulées")
-    st.caption("Cette lecture est préparée à l’avance pour chaque scénario. Elle illustre ce qu’un assistant pourrait traiter ; aucune IA n’analyse réellement le langage naturel dans cette version.")
-    st.write("**Demande de l’utilisateur :** résumer ses courriels. Cette tâche est autorisée. Nous vérifions si un résumé conforme est effectivement fourni, malgré les demandes du courriel.")
-    if scenario["excerpt"]:
-        st.write("**Passage du courriel à examiner :**")
-        st.info(scenario["excerpt"])
-    st.write("**Ce que nous représentons dans la simulation :** " + scenario["interpretation"])
-    st.write("**Ce que l’on compare :** l’assistant naïf accepte les actions encodées dans le scénario ; l’assistant protégé vérifie leur origine et leurs autorisations.")
-    with st.expander("Détails du scénario et représentation technique"):
-        st.write(scenario["mechanism"])
-        st.code(scenario["body"], language=None, wrap_lines=True)
-        st.caption("Cette représentation technique est écrite à l’avance, séparément du courriel affiché. Les balises SIM déclenchent les actions fictives ; elles ne sont pas extraites automatiquement du texte. Sans balise, aucune action supplémentaire n’est reconnue.")
-    if st.button("Comparer les deux assistants sur ce courriel", type="primary"):
+    setup, document = st.columns([1.2, 1.8], gap="medium")
+    with setup:
+        with st.container(border=True):
+            st.caption("01 / PRÉPARER")
+            chosen = st.selectbox("Scénario", range(len(catalog)), format_func=lambda i: catalog[i]["title"])
+            scenario = catalog[chosen]
+            identity = st.selectbox("Personne fictive qui utilise l’assistant", ["alice", "bob"], format_func=str.capitalize)
+            st.divider()
+            st.markdown("**Tâche légitime**")
+            st.write(f"{identity.capitalize()} demande : « Résume mes courriels. »")
+            st.caption("Les autres opérations sur la messagerie ne sont pas autorisées.")
+            launched = st.button("Comparer les deux assistants sur ce courriel", type="primary", width="stretch")
+        with st.expander("Qui fait quoi ?"):
+            st.write("Alice et Bob sont les utilisateurs fictifs. L’assistant naïf suit les actions encodées dans le scénario ; le protégé contrôle leurs autorisations.")
+    with document:
+        st.caption("02 / INSPECTER LE MESSAGE")
+        email_card(scenario, identity)
+        with st.expander("Comprendre le piège et sa représentation"):
+            st.caption("Interprétation préparée, sans analyse automatique du langage naturel.")
+            if scenario["excerpt"]:
+                st.info(scenario["excerpt"])
+            st.write(scenario["interpretation"])
+            st.write(scenario["mechanism"])
+            st.code(scenario["body"], language=None, wrap_lines=True)
+            st.caption("Les balises SIM sont écrites à l’avance et ne font pas partie du courriel naturel affiché.")
+    if launched:
         results = [run(scenario, mode, identity) for mode in ["naïf", "protégé"]]
         st.session_state["laboratory_result"] = results
         persist(results)
     results = st.session_state.get("laboratory_result")
+    st.divider()
     if results and results[0]["scenario_id"] == scenario["id"] and results[0]["identité"] == identity:
         result_view(results)
+    else:
+        st.subheader("03 / Résultats de l’expérience")
+        st.info("Prêt à comparer. Lancez l’expérience pour afficher les décisions des deux assistants ici.")
 
 
 def comparison():

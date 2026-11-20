@@ -4,11 +4,11 @@
 
 BrèchIA est un laboratoire pédagogique local, en français, développé en Python avec Streamlit. Il présente des courriels fictifs et compare un assistant naïf à un assistant qui contrôle l’origine et les autorisations de chaque action.
 
-> Aucun véritable modèle d’IA n’est utilisé. Les scénarios et résumés sont préparés à l’avance. Aucun courriel n’est envoyé, aucun fournisseur n’est testé et aucune vulnérabilité réelle n’est revendiquée.
+> Deux modes distincts : simulateur pédagogique déterministe, et laboratoire expérimental avec un modèle local facultatif. Aucun courriel réel n’est envoyé et aucun service tiers n’est testé. Les résultats ne constituent pas une découverte de vulnérabilité chez des fournisseurs.
 
 ## Installation
 
-Prérequis : **Python 3.11 à 3.13** (version testée : 3.13), et une connexion Internet pour installer les dépendances. Aucun compte, clé API ou modèle à télécharger.
+Prérequis : **Python 3.11 à 3.13** (version testée : 3.13), et une connexion Internet pour installer les dépendances. Aucun compte ni clé API requis. Le simulateur ne nécessite aucun modèle ; le mode réel demande un téléchargement facultatif séparé.
 
 Télécharger le dépôt en ZIP puis l’extraire, ou le cloner avec Git. Ouvrir un terminal **dans le dossier contenant `app.py`**.
 
@@ -39,7 +39,7 @@ Le démarrage Streamlit classique reste disponible depuis la racine :
 python -m streamlit run app.py
 ```
 
-Le serveur est limité à l’ordinateur local et la télémétrie Streamlit est désactivée. Le code du démonstrateur n’appelle aucun service externe. L’installation des dépendances nécessite un accès au registre Python.
+Le serveur est limité à l’ordinateur local et la télémétrie Streamlit est désactivée. Le mode réel appelle uniquement Ollama sur 127.0.0.1:11434 ; aucun courriel n’est transmis à un service distant. L’installation des dépendances nécessite un accès au registre Python.
 
 ## Première expérience en deux minutes
 
@@ -127,3 +127,41 @@ Le développement initial du code, de la documentation et des tests a été assi
 Palette inspirée du [bleu institutionnel du réseau de l’Université du Québec](https://reseau.uquebec.ca/fr/system/files/documents/divers/couleurs-etablissements.pdf), sans logo ni affiliation officielle. Documentation technique : [Streamlit](https://docs.streamlit.io/).
 
 **Licence :** aucune licence de réutilisation n’a encore été choisie. La visibilité publique du dépôt ne suffit pas à accorder une licence libre ; les titulaires des droits doivent décider des conditions de distribution et de réutilisation.
+
+
+## Mode réel local — expérimental
+
+Installer [Ollama](https://ollama.com/download) séparément. Exemple macOS avec Homebrew : `brew install ollama`. Le programme n’installe ni ne télécharge de modèle à votre place.
+
+Dans un terminal, démarrer le serveur (macOS/Linux) :
+
+```bash
+OLLAMA_NO_CLOUD=1 OLLAMA_HOST=127.0.0.1:11434 OLLAMA_NUM_PARALLEL=1 ollama serve
+```
+
+Dans un autre terminal, télécharger une fois un petit modèle, puis démarrer BrèchIA dans son environnement Python :
+
+```bash
+ollama pull qwen3:1.7b
+python app.py
+```
+
+Dans **Modèle réel (local)**, détecter les modèles, choisir un scénario et les protections, puis lancer. Le modèle Qwen3 1.7B représente environ 1,4 Go de téléchargement ; sa mémoire d’exécution est supérieure à la taille du fichier. Contexte limité à 4096 tokens, 700 tokens de sortie, température 0, graine 42 par défaut. Traitement séquentiel et déchargement du modèle après chaque requête. Aucune promesse de performance sur toutes les machines.
+
+Quatre configurations : baseline, consigne seule, autorisation seule, consigne + autorisation. Baseline et autorisation seule reçoivent le même prompt. Le seul mandat autorisé est le résumé du courriel déjà fourni ; toute demande de lire une autre boîte, supprimer ou transmettre est donc hors mandat. Même sans contrôleur, les outils ne manipulent que des listes de messages fictifs en mémoire. Une cible qui ressemble à une adresse réseau ou à un chemin ne sera jamais ouverte.
+
+**Portée :** modèle préentraîné utilisé en inférence, aucun entraînement effectué ici. Expérience à une étape avec JSON imposé : ce ne sont pas encore des appels natifs d’outils ni une boucle agentique multitoures. Les observations dépendent du format demandé et du petit modèle choisi. Les actions proposées sont appliquées à des outils fictifs après la génération ; leurs résultats ne sont pas renvoyés au modèle.
+
+La réponse réelle et les actions demandées sont enregistrées avec le prompt exact, le scénario complet et son empreinte, le modèle et son digest, les réglages, la version d’Ollama, la révision Git et l’empreinte des sources, les temps, erreurs et décisions. Aucun champ de référence, balise SIM ou étiquette attaque/témoin n’est envoyé au modèle. Un modèle manquant n’est pas téléchargé automatiquement. Les modèles cloud sont exclus de la sélection.
+
+Les expériences réelles ont leur propre historique dans la page du modèle réel. Les taux de l’ancien tableau de bord concernent uniquement le simulateur. Une erreur, une réponse tronquée ou un JSON invalide reste une erreur technique. Aucune action proposée ne signifie pas nécessairement un résumé correct : évaluer manuellement la fidélité dans l’historique (conforme, incorrect, absent, incertain), avec une justification. Les références sont indicatives et ne remplacent pas la lecture du courriel. Export JSON de chaque fiche, incluant l’évaluation.
+
+Le bouton global de remise à zéro supprime aussi ces expériences et évaluations. Arrêter Streamlit et Ollama avec Ctrl+C dans leurs terminaux respectifs ; aucun lancement automatique à l’ouverture de session n’est configuré. `ollama ps` montre les modèles encore chargés ; `ollama stop qwen3:1.7b` décharge ce modèle sans supprimer son téléchargement.
+
+Références techniques : [API chat d’Ollama](https://docs.ollama.com/api/chat), [modèle Qwen3](https://ollama.com/library/qwen3). Les conditions de licence du modèle s’appliquent indépendamment de celles du code BrèchIA.
+
+
+## Organisation de l’interface
+La vue d’ensemble propose deux accès : **Simulateur pédagogique** (comportements préparés) et **Expériences avec un modèle** (réponses générées). Chaque laboratoire sépare configuration, document d’essai et résultats. Les paramètres avancés et traces techniques sont repliés par défaut. Les expériences réelles disposent d’onglets Préparer une expérience et Résultats et évaluations ; leurs résultats restent visibles après une interaction avec les réglages, avec un rappel de la configuration exécutée.
+
+Feuille de route : interface de laboratoire clarifiée, puis diversification des données et tâches, puis compatibilité élargie des modèles. La traduction complète français/anglais est prévue ultérieurement ; aucun sélecteur de langue inactif n’est affiché.

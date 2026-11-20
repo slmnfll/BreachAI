@@ -26,14 +26,19 @@ if __name__ == "__main__":
 
 import streamlit as st
 from ui.styles import header
+from ui.real_lab import real_laboratory
 from ui.pages import dashboard, laboratory, comparison, logs, methodology
 
 st.set_page_config(page_title="BrèchIA · Laboratoire", page_icon="🛡️", layout="wide")
 header()
-st.sidebar.title("BrèchIA")
-st.sidebar.caption("Sécurité des agents d’IA")
-page = st.sidebar.radio("Navigation", ["Tableau de bord", "Laboratoire", "Comparaison", "Historique et journaux", "Méthodologie et éthique"])
+st.sidebar.html('<div class="lab-wordmark">BrèchIA</div>')
+st.sidebar.caption("Laboratoire de sécurité des agents d’IA")
+NAV_LABELS = {"Tableau de bord": "Vue d’ensemble", "Laboratoire": "Simulateur pédagogique", "Comparaison": "Campagnes simulées", "Historique et journaux": "Journaux du simulateur", "Méthodologie et éthique": "Protocole et éthique", "Modèle réel (local)": "Expériences avec un modèle"}
 st.sidebar.divider()
-st.sidebar.info("100 % local\n\nSans modèle, sans API payante et sans messagerie réelle.")
+page = st.sidebar.radio("Espace de travail", list(NAV_LABELS), format_func=NAV_LABELS.get, key="navigation")
+st.sidebar.divider()
+with st.sidebar.expander("Quel espace choisir ?"):
+    st.write("**Simulateur** : comprendre les mécanismes avec des résultats préparés.\n\n**Modèle réel** : observer les réponses générées par une IA locale.")
+st.sidebar.caption("Projet pédagogique indépendant · INF5163\n\nAucune affiliation officielle à l’UQO. Aucun service tiers testé.")
 {"Tableau de bord": dashboard, "Laboratoire": laboratory, "Comparaison": comparison,
- "Historique et journaux": logs, "Méthodologie et éthique": methodology}[page]()
+ "Modèle réel (local)": real_laboratory, "Historique et journaux": logs, "Méthodologie et éthique": methodology}[page]()

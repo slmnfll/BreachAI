@@ -25,7 +25,7 @@ def test_user_journey(tmp_path, monkeypatch):
     assert len(at.metric) == 8
     at.sidebar.radio[0].set_value('Historique et journaux').run()
     assert not at.exception
-    assert len(at.expander) == 31
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31
     at.sidebar.radio[0].set_value('Méthodologie et éthique').run()
     assert not at.exception
     at.sidebar.radio[0].set_value('Tableau de bord').run()
@@ -51,20 +51,20 @@ def test_grouped_history_search_pagination_and_reset(tmp_path, monkeypatch):
     at = AppTest.from_file(APP, default_timeout=15).run()
     at.sidebar.radio[0].set_value('Historique et journaux').run()
     assert not at.exception
-    assert len(at.expander) == 31  # 10 groupes, 20 assistants, remise à zéro
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31  # 10 groupes, 20 assistants, remise à zéro
     assert at.button(key='history_prev').disabled
     at.button(key='history_next').click().run()
-    assert len(at.expander) == 31
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31
     assert at.button(key='history_next').disabled
     at.button(key='history_number_1').click().run()
-    assert len(at.expander) == 31
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31
     at.text_input(key='history_search').set_value('FAUSSE ASSISTANCE').run()
-    assert len(at.expander) == 7  # deux campagnes distinctes, chacune avec deux assistants
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 7  # deux campagnes distinctes, chacune avec deux assistants
     assert at.session_state['history_page'] == 1
     at.selectbox(key='history_mode').set_value('protégé').run()
-    assert len(at.expander) == 5
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 5
     at.text_input(key='history_search').set_value('aucun resultat xyz').run()
-    assert len(at.expander) == 1
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 1
     assert at.button(key='history_next').disabled
     at.checkbox(key='confirm_reset').check().run()
     at.button[0].click().run()
@@ -82,13 +82,13 @@ def test_email_and_grouped_comparison(tmp_path, monkeypatch):
     assert any('L’attaque a réussi' in item.value for item in at.error)
     at.sidebar.radio[0].set_value('Comparaison').run()
     at.button[0].click().run()
-    assert len(at.expander) == 30
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 30
     assert len(at.metric) == 8
     at.text_input(key='comparison_search').set_value('reunion').run()
-    assert len(at.expander) == 3
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 3
     assert len(at.metric) == 8
     at.text_input(key='comparison_search').set_value('A01').run()
-    assert len(at.expander) == 3
+    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 3
     at.selectbox(key='comparison_size').set_value(25).run()
     assert at.session_state['comparison_page'] == 1
     assert not at.exception
@@ -108,3 +108,12 @@ def test_new_task_results_visible(tmp_path, monkeypatch):
     at.button[0].click().run()
     assert at.metric[3].value == '80%'
     assert at.metric[7].value == '100%'
+
+
+def test_dashboard_shortcuts(tmp_path, monkeypatch):
+    monkeypatch.setenv('BRECHIA_DB', str(tmp_path/'shortcuts.sqlite3'))
+    at = AppTest.from_file(APP, default_timeout=15).run()
+    next(b for b in at.button if b.label == 'Préparer une expérience réelle').click().run()
+    assert not at.exception
+    assert at.sidebar.radio[0].value == 'Modèle réel (local)'
+    assert any(b.label == 'Lancer l’expérience réelle' and b.disabled for b in at.button)

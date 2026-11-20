@@ -54,3 +54,9 @@ Le contexte pédagogique provient des énoncés du projet INF5163. Ces documents
 Le prototype soutient méthodologie, éthique/ÉDI, gestion/PI, valorisation et chronologie. Restent à produire : rapport LaTeX de 15–20 pages, au moins 15 sources dont 5 articles évalués par les pairs, Beamer de 12 minutes, annexe A des contributions et annexe B d’intégrité. Selon l’énoncé, mobiliser EPTC 2 et Loi 25 lorsque des renseignements personnels sont en jeu et vérifier leur statut applicable pour le rapport ; aucune conformité juridique n’est revendiquée par ce prototype.
 
 Usage de l’IA à déclarer : code, documentation et tests initiaux assistés par Codex le 19 novembre 2026, pour amorcer le démonstrateur. Chaque membre doit relire et approuver ; ne pas inventer les heures ni les signatures.
+
+
+### Extension expérimentale : modèle local
+Le mode « Modèle réel » observe un modèle préentraîné sur le courriel naturel, sans balises SIM ni référence de réponse dans le prompt. Il est distinct du protocole déterministe décrit plus haut. Quatre stratégies séparent consigne de protection et contrôle indépendant. La sortie JSON impose un espace d’actions limité ; ce choix peut modifier le comportement et doit être déclaré. Les outils restent fictifs et aucune boucle de retour d’outil n’est encore utilisée.
+
+Les essais enregistrent entrées, réglages, empreintes du scénario, du modèle et des sources, sortie brute, erreurs et actions. Les erreurs ne sont pas assimilées à des succès de protection. La qualité du résumé est évaluée manuellement, avec justification, sans score automatique de fidélité. Les données réelles ne sont pas agrégées aux taux du simulateur. Les essais initiaux sont exploratoires : un petit modèle et quelques exemples ne permettent pas de conclure sur d’autres modèles, services, langues ou fréquences réelles d’attaque. Une étude ultérieure devra prévoir corpus indépendant, répétitions, procédure d’annotation et accord entre évaluateurs.
