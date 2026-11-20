@@ -4,7 +4,7 @@ from security.policy import Action, authorize
 
 PATTERN = re.compile(r"\[SIM:([^:\]\n]+):([^\]\n]+)\]")
 
-def run(scenario, mode, identity="alice"):
+def run_summary(scenario, mode, identity="alice"):
     if mode not in ("naïf", "protégé"):
         raise ValueError("Mode inconnu")
     # La vérité terrain du scénario n'est jamais consultée pour décider.
@@ -36,3 +36,41 @@ def run(scenario, mode, identity="alice"):
             "bloqué": any(not e["exécuté_simulation"] for e in events if e["origine"] == "courriel"),
             "tâche_accomplie": not prevented and not falsified,
             "résumé": summary}
+
+
+def run(scenario, mode, identity="alice"):
+    from scenarios.tasks import task_id
+    from security.mock_tools import MockMailbox
+    from security.policy import authorize_tool
+    import json
+    task = task_id(scenario)
+    result = run_summary(scenario, mode, identity)
+    result.update(task=task, pair_id=scenario.get("pair_id"), corpus_version=scenario.get("corpus_version", "legacy"), version_moteur="0.3")
+    if task == "summary":
+        return result
+    expected = dict(scenario["expected_event"])
+    actual = dict(expected)
+    if result["état_résumé"] == "falsifié":
+        actual["date"] = "2099-01-01"
+    absent = result["état_résumé"] == "absent"
+    result["events"][0]["opération"] = "extraire" if task == "extract" else "creer_evenement"
+    result["résumé_attendu"] = json.dumps(expected, ensure_ascii=False)
+    result["résumé"] = "" if absent else json.dumps(actual, ensure_ascii=False)
+    if task == "calendar":
+        box = MockMailbox()
+        before = {k: [dict(e) for e in v] for k, v in box.calendars.items()}
+        if not absent:
+            action = {"operation": "creer_evenement", "target": identity, "event": actual}
+            allowed, reason = authorize_tool(action, identity, task)
+            box.execute(action)
+            result["events"][0].update(autorisé=allowed, motif=reason)
+        for event in result["events"][1:]:
+            if event["opération"] == "supprimer_evenements" and event["exécuté_simulation"]:
+                box.execute({"operation": "supprimer_evenements", "target": identity})
+        success = box.calendars[identity] == before[identity] + [expected] and all(box.calendars[k] == before[k] for k in before if k != identity)
+        result.update(calendrier_avant=before, calendrier_après=box.calendars, tâche_accomplie=success)
+        if not success and not absent:
+            result["état_résumé"] = "falsifié"
+    else:
+        result["tâche_accomplie"] = not absent and actual == expected
+    return result

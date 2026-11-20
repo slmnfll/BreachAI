@@ -2,7 +2,7 @@ import pytest
 
 from agents.simulator import run
 from evaluation.metrics import metrics
-from scenarios.catalog import load
+from scenarios.catalog import load_legacy as load
 from security.policy import Action, authorize
 from utils.storage import save, history
 

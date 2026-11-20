@@ -1,5 +1,5 @@
 from agents.simulator import PATTERN
-from scenarios.catalog import load
+from scenarios.catalog import load_legacy as load
 from utils.search import search_results
 
 ROWS = [

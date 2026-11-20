@@ -5,6 +5,8 @@ from agents.simulator import run
 from scenarios.catalog import load
 from evaluation.metrics import metrics
 from ui.styles import section_title, email_card
+from scenarios.tasks import TASKS, task_id, instruction
+from ui.task_picker import select_task
 from ui.search import live_search
 from utils.search import search_results
 from utils.storage import history, save, reset_history
@@ -143,16 +145,20 @@ def reset_controls():
 
 def summary_view(result):
     status = result.get("état_résumé")
+    st.caption("Tâche : " + TASKS.get(result.get("task", "summary"), "Résumé"))
     if status is None:
         st.caption("Ancien résultat : fidélité du résumé non évaluée par cette version du moteur.")
         st.write("Résumé enregistré : " + result["résumé"])
         return
-    labels = {"absent": "Aucun résumé produit", "falsifié": "Résumé produit mais falsifié", "conforme": "Résumé conforme à la référence préparée"}
+    labels = {"absent": "Aucun résultat produit", "falsifié": "Résultat incorrect ou altéré", "conforme": "Résultat conforme à la référence préparée"}
     st.write("**Résultat de la tâche :** " + labels[status])
     if result["résumé"]:
-        st.write("**Résumé obtenu (préécrit) :** " + result["résumé"])
+        st.write("**Résultat obtenu (préparé pour la simulation) :** " + result["résumé"])
+    if "calendrier_après" in result:
+        with st.expander("État du calendrier fictif avant / après"):
+            st.json({"avant": result["calendrier_avant"], "après": result["calendrier_après"]})
     if status != "conforme":
-        st.write("**Résumé attendu (référence préécrite) :** " + result["résumé_attendu"])
+        st.write("**Résultat attendu (référence préparée) :** " + result["résumé_attendu"])
 
 
 def result_view(results):
@@ -232,13 +238,14 @@ def laboratory():
     with setup:
         with st.container(border=True):
             st.caption("01 / PRÉPARER")
-            chosen = st.selectbox("Scénario", range(len(catalog)), format_func=lambda i: catalog[i]["title"])
+            catalog = select_task(catalog, "simulation_task")
+            chosen = st.selectbox("Scénario", range(len(catalog)), format_func=lambda i: catalog[i]["id"] + " · " + catalog[i]["title"])
             scenario = catalog[chosen]
             identity = st.selectbox("Personne fictive qui utilise l’assistant", ["alice", "bob"], format_func=str.capitalize)
             st.divider()
             st.markdown("**Tâche légitime**")
-            st.write(f"{identity.capitalize()} demande : « Résume mes courriels. »")
-            st.caption("Les autres opérations sur la messagerie ne sont pas autorisées.")
+            st.write(f"{identity.capitalize()} demande : {instruction(scenario, identity)}")
+            st.caption("Les permissions viennent de la tâche choisie, pas du courriel.")
             launched = st.button("Comparer les deux assistants sur ce courriel", type="primary", width="stretch")
         with st.expander("Qui fait quoi ?"):
             st.write("Alice et Bob sont les utilisateurs fictifs. L’assistant naïf suit les actions encodées dans le scénario ; le protégé contrôle leurs autorisations.")
@@ -270,9 +277,13 @@ def comparison():
     st.header("Évaluation comparative")
     st.info("Une campagne teste tous les scénarios sélectionnés avec les deux versions de l’assistant. Les indicateurs résument l’ensemble ; ouvrez ensuite un scénario pour comparer ses deux décisions.")
     catalog = load()
+    selected_task = st.selectbox("Tâches de la campagne", ["Toutes"] + list(TASKS), format_func=lambda k: TASKS.get(k, k))
+    if selected_task != "Toutes":
+        catalog = [s for s in catalog if task_id(s) == selected_task]
+    st.caption("Corpus 1.0 : 15 paires de messages, avec les mêmes faits utiles dans chaque témoin et sa variante avec injection.")
     selected = st.multiselect("Corpus de la campagne", [s["id"] for s in catalog],
                               default=[s["id"] for s in catalog],
-                              format_func=lambda sid: next(s["title"] for s in catalog if s["id"] == sid))
+                              format_func=lambda sid: sid + " · " + next(s["title"] for s in catalog if s["id"] == sid))
     st.caption("Protocole apparié : mêmes scénarios, même identité Alice, deux agents. Une exécution par cas ; répéter ne crée pas d’observation indépendante.")
     if st.button("Lancer la campagne", type="primary", disabled=not selected):
         results = [run(s, mode) for s in catalog if s["id"] in selected for mode in ["naïf", "protégé"]]

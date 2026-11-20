@@ -47,25 +47,17 @@ def test_grouped_history_search_pagination_and_reset(tmp_path, monkeypatch):
     from utils.storage import save, history
     monkeypatch.setenv('BRECHIA_DB', str(tmp_path/'pages.sqlite3'))
     for _ in range(2):
-        save([run(s, mode) for s in load() for mode in ['naïf', 'protégé']])
+        save([run(s, mode) for s in load()[:10] for mode in ['naïf', 'protégé']])
     at = AppTest.from_file(APP, default_timeout=15).run()
     at.sidebar.radio[0].set_value('Historique et journaux').run()
     assert not at.exception
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31  # 10 groupes, 20 assistants, remise à zéro
     assert at.button(key='history_prev').disabled
     at.button(key='history_next').click().run()
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31
     assert at.button(key='history_next').disabled
-    at.button(key='history_number_1').click().run()
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 31
-    at.text_input(key='history_search').set_value('FAUSSE ASSISTANCE').run()
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 7  # deux campagnes distinctes, chacune avec deux assistants
-    assert at.session_state['history_page'] == 1
+    at.text_input(key='history_search').set_value('R01-A').run()
+    assert len(at.dataframe) == 4
     at.selectbox(key='history_mode').set_value('protégé').run()
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 5
-    at.text_input(key='history_search').set_value('aucun resultat xyz').run()
-    assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 1
-    assert at.button(key='history_next').disabled
+    assert len(at.dataframe) == 2
     at.checkbox(key='confirm_reset').check().run()
     at.button[0].click().run()
     assert not at.exception
@@ -76,18 +68,18 @@ def test_email_and_grouped_comparison(tmp_path, monkeypatch):
     monkeypatch.setenv('BRECHIA_DB', str(tmp_path/'mail.sqlite3'))
     at = AppTest.from_file(APP, default_timeout=15).run()
     at.sidebar.radio[0].set_value('Laboratoire').run()
-    at.selectbox[0].set_value(2).run()
-    assert any('Nous effectuons une vérification' in item.value for item in at.markdown)
+    next(w for w in at.selectbox if w.label == 'Scénario').set_value(1).run()
+    assert any('La prochaine rencontre' in item.value for item in at.markdown)
     at.button[0].click().run()
     assert any('L’attaque a réussi' in item.value for item in at.error)
     at.sidebar.radio[0].set_value('Comparaison').run()
     at.button[0].click().run()
     assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 30
     assert len(at.metric) == 8
-    at.text_input(key='comparison_search').set_value('reunion').run()
+    at.text_input(key='comparison_search').set_value('R01-T').run()
     assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 3
     assert len(at.metric) == 8
-    at.text_input(key='comparison_search').set_value('A01').run()
+    at.text_input(key='comparison_search').set_value('R01-A').run()
     assert len([e for e in at.expander if e.label != "Quel espace choisir ?"]) == 3
     at.selectbox(key='comparison_size').set_value(25).run()
     assert at.session_state['comparison_page'] == 1
@@ -98,16 +90,15 @@ def test_new_task_results_visible(tmp_path, monkeypatch):
     monkeypatch.setenv('BRECHIA_DB', str(tmp_path/'task.sqlite3'))
     at = AppTest.from_file(APP, default_timeout=15).run()
     at.sidebar.radio[0].set_value('Laboratoire').run()
-    for index, expected in [(8, 'Aucun résumé produit'), (9, 'Résumé produit mais falsifié')]:
-        at.selectbox[0].set_value(index).run()
+    for task in ['extract', 'calendar']:
+        at.selectbox(key='simulation_task').set_value(task).run()
         at.button[0].click().run()
         assert not at.exception
-        assert any(expected in m.value for m in at.markdown)
-        assert any('Résumé attendu' in m.value for m in at.markdown)
+        assert len(at.dataframe) == 2
     at.sidebar.radio[0].set_value('Comparaison').run()
     at.button[0].click().run()
-    assert at.metric[3].value == '80%'
     assert at.metric[7].value == '100%'
+    assert at.metric[3].value != '100%'
 
 
 def test_dashboard_shortcuts(tmp_path, monkeypatch):

@@ -2,7 +2,7 @@ import json
 import pytest
 from agents.ollama_local import ModelError
 from evaluation.runner import run_experiment, messages_for, validate
-from scenarios.catalog import load
+from scenarios.catalog import load_legacy as load
 from utils.experiments import save_experiment, experiments, review
 from utils.storage import reset_history
 
