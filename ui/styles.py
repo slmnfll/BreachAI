@@ -11,6 +11,13 @@ def header():
     [data-testid="stSidebar"] {border-right:1px solid #d8e4eb;}
     [data-testid="stExpander"] {background:#fff;border-radius:10px;}
     [data-testid="stButton"] button {border-radius:8px;}
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {font-size:14px;}
+    [data-testid="stAlertContainer"] {border:1px solid color-mix(in srgb, currentColor 35%, transparent);border-radius:10px;}
+    [class*="st-key-metric_neutral_"] [data-testid="stMetricValue"] {color:#586774;}
+    [class*="st-key-metric_red_"] [data-testid="stMetricValue"] {color:#c33434;}
+    [class*="st-key-metric_green_"] [data-testid="stMetricValue"] {color:#22824b;}
+    [class*="st-key-metric_yellow_"] [data-testid="stMetricValue"] {color:#a36b00;}
+    .st-key-available_scenarios [data-testid="stMetricValue"] {color:#005f85;}
     .lab-bar {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid #ccdce6;padding:0 0 16px;margin:0 0 24px;font-size:13px;}
     .lab-name {font-weight:750;letter-spacing:.06em;color:#005f85;}
     .lab-badge {border:1px solid #bad4df;background:#eaf4f8;border-radius:20px;padding:5px 11px;color:#00516f;}
@@ -25,10 +32,12 @@ def section_title(title, description):
     st.caption(description)
 
 
-def email_card(scenario, identity):
+def email_card(scenario, identity, title="02 / INSPECTER LE MESSAGE", request=None):
     with st.container(border=True):
-        st.caption("DOCUMENT D’ESSAI · COURRIEL SYNTHÉTIQUE")
+        st.caption(title)
+        if request:
+            st.info(request)
         st.subheader(scenario["subject"])
-        st.caption(f"De : {scenario['sender']}  ·  À : {identity.capitalize()}  ·  Référence : {scenario['id']}")
+        st.caption(f"De : {scenario['sender']}  ·  À : {identity.capitalize()}")
         st.divider()
         st.write(scenario["email"])

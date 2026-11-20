@@ -8,6 +8,7 @@ from ui.styles import section_title, email_card
 from scenarios.tasks import TASKS, task_id, instruction
 from ui.task_picker import select_task
 from ui.search import live_search
+from ui.selection import french_multiselect
 from utils.search import search_results
 from utils.storage import history, save, reset_history
 
@@ -30,19 +31,41 @@ def persist(results):
 
 
 def percent(value):
-    return "Non mesuré" if value is None else f"{value:.0%}"
+    return "S/O" if value is None else f"{value:.0%}"
 
 
-def indicators(results):
+def metric_color(key, value):
+    """Repères visuels sur le corpus testé, sans certification de sécurité."""
+    if value is None:
+        return "neutral"
+    if key in ("réussite_attaques", "faux_positifs"):
+        return "green" if value == 0 else "yellow" if value < .5 else "red"
+    return "green" if value == 1 else "yellow" if value >= .5 else "red"
+
+
+def indicators(results, show_counts=True, scope="default"):
     m = metrics(results)
     if any("version_moteur" not in r for r in results):
         st.caption("Résultats historiques : la version initiale comptait uniquement l’exécution du résumé. Relancez une campagne pour appliquer les nouveaux critères.")
     cols = st.columns(4)
     for c, label, key in zip(cols, ["Réussite des attaques", "Blocage des attaques", "Faux positifs", "Tâche légitime accomplie"],
                              ["réussite_attaques", "blocage_attaques", "faux_positifs", "utilité"]):
-        c.metric(label, percent(m[key]))
-    st.caption(f"Dénominateurs : {m['attaques']} essais malveillants · {m['témoins']} témoins · {m['essais']} essais au total.")
+        value = m[key]
+        color = metric_color(key, value)
+        with c, st.container(key="metric_" + color + "_" + key + "_" + scope):
+            st.metric(label, percent(value))
+    if show_counts:
+        st.caption(f" {m['attaques']} essais malveillants · {m['témoins']} témoins · {m['essais']} essais au total.")
 
+
+
+def paired_indicators(results):
+    groups = [[r for r in results if r["mode"] == mode] for mode in ("naïf", "protégé")]
+    counts = [tuple(metrics(g)[k] for k in ("attaques", "témoins", "essais")) for g in groups]
+    for i, (mode, group) in enumerate(zip(("naïf", "protégé"), groups)):
+        st.subheader("Assistant " + mode)
+        with st.container(key="indicators_" + str(i)):
+            indicators(group, show_counts=i == 1 or counts[0] != counts[1], scope=str(i))
 
 def outcome(result):
     if result["compromis"]:
@@ -117,8 +140,9 @@ def grouped_results(results, key):
         st.button("‹", key=key + "_prev", help="Page précédente", disabled=page == 1, on_click=go, args=(page - 1,))
         for number in slots:
             if number not in numbers:
-                with st.container(width=28):
-                    st.write("…")
+                with st.popover("…", help="Aller à une page", key=f"{key}_jump_menu_{number}"):
+                    target = st.number_input("Aller à la page", min_value=1, max_value=pages, value=page, step=1, key=f"{key}_jump_value_{number}")
+                    st.button("Afficher cette page", key=f"{key}_jump_go_{number}", on_click=go, args=(int(target),))
             else:
                 st.button(str(number), key=f"{key}_number_{number}", type="primary" if page == number else "secondary", on_click=go, args=(number,))
         st.button("›", key=key + "_next", help="Page suivante", disabled=page == pages, on_click=go, args=(page + 1,))
@@ -195,7 +219,8 @@ def dashboard():
         real = []
         st.warning("L’historique des modèles réels n’a pas pu être chargé.")
     a, b, c = st.columns(3)
-    a.metric("Scénarios disponibles", len(catalog))
+    with a, st.container(key="available_scenarios"):
+        st.metric("Scénarios disponibles", len(catalog))
     b.metric("Campagnes simulées", len(rows))
     c.metric("Essais avec un modèle", len(real))
     st.subheader("Choisir un espace d’expérimentation")
@@ -205,7 +230,7 @@ def dashboard():
     with left, st.container(border=True):
         st.caption("01 / COMPRENDRE")
         st.subheader("Simulateur pédagogique")
-        st.write("Explorez un courriel et comparez deux assistants aux comportements prédéfinis. Idéal pour comprendre chaque décision.")
+        st.write("Explorer un courriel et comparer deux assistants au comportement prédéfini.")
         st.button("Ouvrir le simulateur", on_click=navigate, args=("Laboratoire",), width="stretch")
     with right, st.container(border=True):
         st.caption("02 / OBSERVER")
@@ -214,9 +239,7 @@ def dashboard():
         st.button("Préparer une expérience réelle", on_click=navigate, args=("Modèle réel (local)",), type="primary", width="stretch")
     with st.expander("Dernière campagne du simulateur", expanded=False):
         if rows:
-            for mode in ["naïf", "protégé"]:
-                st.markdown("**Assistant " + mode + "**")
-                indicators([r for r in rows[0]["résultats"] if r["mode"] == mode])
+            paired_indicators(rows[0]["résultats"])
         else:
             st.info("Aucune campagne simulée. Les résultats apparaîtront après votre premier essai.")
     if real:
@@ -250,7 +273,6 @@ def laboratory():
         with st.expander("Qui fait quoi ?"):
             st.write("Alice et Bob sont les utilisateurs fictifs. L’assistant naïf suit les actions encodées dans le scénario ; le protégé contrôle leurs autorisations.")
     with document:
-        st.caption("02 / INSPECTER LE MESSAGE")
         email_card(scenario, identity)
         with st.expander("Comprendre le piège et sa représentation"):
             st.caption("Interprétation préparée, sans analyse automatique du langage naturel.")
@@ -275,16 +297,14 @@ def laboratory():
 
 def comparison():
     st.header("Évaluation comparative")
-    st.info("Une campagne teste tous les scénarios sélectionnés avec les deux versions de l’assistant. Les indicateurs résument l’ensemble ; ouvrez ensuite un scénario pour comparer ses deux décisions.")
+    st.caption("Une campagne teste tous les scénarios sélectionnés avec les deux versions de l’assistant. Les indicateurs résument l’ensemble ; ouvrez ensuite un scénario pour comparer ses deux décisions.")
     catalog = load()
     selected_task = st.selectbox("Tâches de la campagne", ["Toutes"] + list(TASKS), format_func=lambda k: TASKS.get(k, k))
     if selected_task != "Toutes":
         catalog = [s for s in catalog if task_id(s) == selected_task]
-    st.caption("Corpus 1.0 : 15 paires de messages, avec les mêmes faits utiles dans chaque témoin et sa variante avec injection.")
-    selected = st.multiselect("Corpus de la campagne", [s["id"] for s in catalog],
-                              default=[s["id"] for s in catalog],
-                              format_func=lambda sid: sid + " · " + next(s["title"] for s in catalog if s["id"] == sid))
-    st.caption("Protocole apparié : mêmes scénarios, même identité Alice, deux agents. Une exécution par cas ; répéter ne crée pas d’observation indépendante.")
+    selected = french_multiselect("Corpus de la campagne", [s["id"] for s in catalog],
+                                  key="campaign_corpus_" + selected_task,
+                                  format_func=lambda sid: sid + " · " + next(s["title"] for s in catalog if s["id"] == sid))
     if st.button("Lancer la campagne", type="primary", disabled=not selected):
         results = [run(s, mode) for s in catalog if s["id"] in selected for mode in ["naïf", "protégé"]]
         from datetime import datetime, timezone
@@ -293,28 +313,23 @@ def comparison():
         st.session_state["campaign"] = [dict(r, date_utc=created, campagne=run_id or "non enregistrée") for r in results]
     results = st.session_state.get("campaign", [])
     if results:
-        st.caption("Résultats de la dernière campagne lancée ; relancez pour appliquer une nouvelle sélection.")
-        for mode in ["naïf", "protégé"]:
-            st.subheader("Agent " + mode)
-            indicators([r for r in results if r["mode"] == mode])
-        st.caption("Les indicateurs portent sur toute la campagne. Recherche, filtres et pagination changent uniquement les détails affichés. Un bloc regroupe les deux assistants pour un même scénario testé.")
-        filtered = filter_results(results, "comparison")
-        grouped_results(filtered, "comparison")
+        paired_indicators(results)
+        grouped_results(results, "comparison")
         st.download_button("Exporter les résultats et traces (JSON)", json.dumps(results, ensure_ascii=False, indent=2), "brechia-campagne.json", "application/json")
 
 
 def logs():
     st.header("Historique et journaux")
-    reset_controls()
     rows = read_history()
     if not rows:
         st.info("Aucune campagne enregistrée.")
+        reset_controls()
         return
     results = [dict(result, campagne=row["id"], date_utc=row["date_utc"]) for row in rows for result in row["résultats"]]
     st.caption("Un bloc correspond à un scénario d’une campagne et contient les décisions des deux assistants. Deux campagnes différentes restent séparées, même si le scénario est identique. Le filtre d’assistant limite les détails visibles dans chaque bloc.")
     filtered = filter_results(results, "history")
     grouped_results(filtered, "history")
-    st.caption("Horodatages UTC. Journal local modifiable, non signé. L’export contient tous les résultats correspondant aux filtres, pas seulement la page visible.")
+    reset_controls()
     st.download_button("Exporter les résultats filtrés (JSON)", json.dumps(filtered, ensure_ascii=False, indent=2), "brechia-journal.json", "application/json")
 
 

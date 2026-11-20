@@ -6,6 +6,7 @@ _component = st.components.v2.component(
     html='<label for="query">Rechercher dans les expériences</label><input id="query" type="search" placeholder="A 01, réunion, Alice, 2026-11-19…" autocomplete="off" />',
     css="""label {display:block;font:500 15px sans-serif;margin-bottom:8px;color:var(--st-text-color);}
     input {box-sizing:border-box;width:100%;height:42px;border:1px solid #8ba7b8;border-radius:8px;padding:8px 12px;font:16px sans-serif;color:var(--st-text-color);background:var(--st-secondary-background-color);}
+    input::placeholder {font-size:14px;color:#6b7785;opacity:.8;}
     input:focus {outline:2px solid #005f85;outline-offset:1px;}""",
     js="""export default function(component) {
       const input = component.parentElement.querySelector('input');

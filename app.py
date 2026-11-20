@@ -35,7 +35,7 @@ st.sidebar.html('<div class="lab-wordmark">BrèchIA</div>')
 st.sidebar.caption("Laboratoire de sécurité des agents d’IA")
 NAV_LABELS = {"Tableau de bord": "Vue d’ensemble", "Laboratoire": "Simulateur pédagogique", "Comparaison": "Campagnes simulées", "Historique et journaux": "Journaux du simulateur", "Méthodologie et éthique": "Protocole et éthique", "Modèle réel (local)": "Expériences avec un modèle"}
 st.sidebar.divider()
-page = st.sidebar.radio("Espace de travail", list(NAV_LABELS), format_func=NAV_LABELS.get, key="navigation")
+page = st.sidebar.radio("Espace de travail", list(NAV_LABELS), format_func=NAV_LABELS.get, key="navigation", disabled=bool(st.session_state.get("pending_experiment")))
 st.sidebar.divider()
 with st.sidebar.expander("Quel espace choisir ?"):
     st.write("**Simulateur** : comprendre les mécanismes avec des résultats préparés.\n\n**Modèle réel** : observer les réponses générées par une IA locale.")
